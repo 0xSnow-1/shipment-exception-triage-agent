@@ -1,5 +1,12 @@
 # Logistics Shipment Exception Triage Agent
 
+[![Python](https://img.shields.io/badge/Python-3.10+-blue)](https://www.python.org/downloads/)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.1.10-green)](https://langchain-ai.github.io/langgraph/)
+[![LangChain](https://img.shields.io/badge/LangChain-1.2.18-blue)](https://python.langchain.com/)
+[![AWS Bedrock](https://img.shields.io/badge/AWS-Bedrock-yellow)](https://aws.amazon.com/bedrock/)
+[![LangSmith](https://img.shields.io/badge/LangSmith-Traced-orange)](https://smith.langchain.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 LangGraph/LangChain prototype for triaging logistics shipment exceptions with a supervisor-subagent architecture, deterministic tools, mock operational data, evidence logging, and human approval before customer-facing action.
 
 ## Problem
@@ -56,6 +63,7 @@ Human-in-the-loop boundary:
 
 - `mock_send_customer_update` interrupts before writing the approved customer update
 - resume with `"approve"` in LangGraph Studio to approve the mock send
+- resume with `"reject"` to refuse the send, or with `{"decision": "edit", "args": {...}}` to change the shipment, customer, or message and then approve
 - approved sends are written to `outputs/approved_customer_updates.json`
 
 ## Repository Map
@@ -64,12 +72,14 @@ Human-in-the-loop boundary:
 agents.py                     supervisor and subagent wrappers
 tools.py                      deterministic tools and mock persistence actions
 langgraph.json                LangGraph graph export config
+requirements.txt              pinned runtime dependencies
 .env.example                  environment variable template
 mock_data/shipments.json      source shipment records
 mock_data/tracking_events.json mock carrier tracking events
 mock_data/customers.json      mock customer/account records
 mock_data/sla_rules.json      mock SLA rules
 outputs/                      generated triage/evidence artifacts
+outputs/archive/              earlier noisier runs kept for transparency
 manual_workflow.md            manual process being automated
 test_cases.md                 normal, messy, ambiguous, and HITL test cases
 evidence_log.md               human-readable run evidence
@@ -81,6 +91,7 @@ SUBMISSION.md                 challenge-style written response
 
 ## Setup
 
+Requires Python 3.10 or newer.
 Create and activate a virtual environment, then install dependencies:
 
 ```bash
@@ -89,11 +100,21 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Create `.env` with the Bedrock credentials required by `ChatBedrock`:
+Copy the environment template:
+
+```bash
+cp .env.example .env
+```
 
 ```text
-AWS_BEARER_TOKEN_BEDROCK=your_token_here
+AWS_BEARER_TOKEN_BEDROCK=your_bedrock_token_here
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_PROJECT=shipment-exception-triage
 ```
+
+`AWS_BEARER_TOKEN_BEDROCK` is the only required variable.
+The `LANGSMITH_*` variables are optional and only control trace export.
 
 ## Run
 
@@ -109,11 +130,19 @@ Start the local LangGraph server:
 langgraph dev
 ```
 
+The supervisor graph calls `global.anthropic.claude-opus-4-6-v1` through `ChatBedrock` in `us-east-1`, so the Bedrock credential must have access to that model.
+
 Open the Studio URL printed by the command and select:
 
 ```text
 shipment_exception_supervisor
 ```
+
+## Demo
+
+Recorded walkthrough of a live run, the tool-call trace, the human-in-the-loop approval, and the saved artifacts:
+
+https://app.airtimetools.com/recorder/s/z_NSSd9oVPB3Err7TkVN1W
 
 ## Demo Prompts
 
@@ -139,6 +168,8 @@ When the HITL interrupt appears, resume with:
 "approve"
 ```
 
+`"reject"` refuses the send, and `{"decision": "edit", "args": {...}}` applies changed fields before approving.
+
 Ambiguous missing-data case:
 
 ```text
@@ -156,12 +187,22 @@ outputs/evidence_log.jsonl
 outputs/approved_customer_updates.json
 ```
 
+Committed samples of all three files are already in `outputs/`.
+
 The repo also includes human-readable evidence and failure analysis:
 
 ```text
 evidence_log.md
 failure_notes.md
 ```
+
+## Verification
+
+- `langgraph validate` reports a valid config and finds the one graph.
+- `python -c "import agents"` compiles `shipment_exception_supervisor` without credentials.
+- The deterministic tools in `tools.py` run offline against `mock_data/`.
+- The four business test cases in `test_cases.md` were run by hand in LangGraph Studio; results are recorded in `evidence_log.md` and `failure_notes.md`.
+- There is no automated test suite in this prototype.
 
 ## Safety Boundaries
 
@@ -176,3 +217,7 @@ The agent must not autonomously approve refunds, credits, replacements, reships,
 - Does not include production authentication or role-based permissions.
 - Some business thresholds are simplified for demo clarity.
 - LangSmith is used for trace review/observability, not as a full automated evaluation suite in this prototype.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
