@@ -18,7 +18,7 @@ Agent loads SHP-1001 from `mock_data/shipments.json` and uses `Northstar Medical
 
 ![](image.png)
 
-Agent used unknown/random information and details: 
+Agent used unknown/random information and details:
 1. `Promised Delivery: 2026-05-15T09:00:00Z` instead of `"2026-05-15T17:00:00+00:00"`
 2. `Shipment Value: $45,000` instead of `$48,000`
 3. `Service Level: Express` instead of `expedited`

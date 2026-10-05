@@ -503,6 +503,3 @@ def save_triage_result(
         "path": str(path),
         "record": record,
     })
-    
-    
-    
